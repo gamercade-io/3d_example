@@ -5,12 +5,15 @@ use nalgebra::{Rotation3, Vector3};
 mod console;
 use console::*;
 
-#[derive(Default)]
+use crate::graphics::{draw_triangle, Triangle};
+
+mod graphics;
+
 pub struct GameState {
     pub screen_width: i32,
     pub screen_height: i32,
     pub dt: f32,
-    pub line_colors: [i32; 12],
+    pub colors: [i32; 64],
     pub vertex_buffer: Box<[Vector3<f32>]>,
     pub index_buffer: Box<[IndexedTriangle]>,
     pub roll: f32,
@@ -55,20 +58,20 @@ const CUBE_EDGES: [TriangleEdge; 12] = [
 ];
 
 pub struct IndexedTriangle(usize, usize, usize);
-// const CUBE_INDICIES: [IndexedTriangle; 12] = [
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-//     IndexedTriangle( , ,),
-// ];
+const CUBE_INDICIES: [IndexedTriangle; 12] = [
+    IndexedTriangle(0, 2, 1),
+    IndexedTriangle(2, 3, 1),
+    IndexedTriangle(1, 3, 5),
+    IndexedTriangle(3, 7, 5),
+    IndexedTriangle(2, 6, 3),
+    IndexedTriangle(3, 6, 7),
+    IndexedTriangle(4, 5, 7),
+    IndexedTriangle(4, 7, 6),
+    IndexedTriangle(0, 4, 2),
+    IndexedTriangle(2, 4, 6),
+    IndexedTriangle(0, 1, 2),
+    IndexedTriangle(1, 5, 4),
+];
 
 fn to_screen_space(vec: Vector3<f32>, game_state: &GameState) -> Vector3<f32> {
     let z_inv = vec.z.recip();
@@ -81,7 +84,7 @@ fn to_screen_space(vec: Vector3<f32>, game_state: &GameState) -> Vector3<f32> {
 
 /// # Safety
 /// This function calls external Gamercade Api Functions
-unsafe fn log(text: &str) {
+pub unsafe fn log(text: &str) {
     // Casting a pointer to an i32 is giving us the memory address.
     let addr = text.as_ptr() as i32;
 
@@ -100,10 +103,8 @@ pub unsafe extern "C" fn init() {
         pitch: 0.0,
         yaw: 0.0,
         offset_z: 2.0,
-        line_colors: CUBE_EDGES
-            .iter()
-            .enumerate()
-            .map(|(line, _)| graphics_parameters(8, 0, 0, line as i32 + 1, 0, 0))
+        colors: (0..64)
+            .map(|index| graphics_parameters(8, 0, 0, index, 0, 0))
             .collect::<Vec<_>>()
             .try_into()
             .unwrap(),
@@ -158,17 +159,20 @@ pub unsafe extern "C" fn draw() {
     }));
 
     // Render our geometry
-    CUBE_EDGES.iter().enumerate().for_each(|(i, edge)| {
-        let start = GEOMETRY_BUFFER[edge.0];
-        let end = GEOMETRY_BUFFER[edge.1];
-        line(
-            game_state.line_colors[i],
-            start.x as i32,
-            start.y as i32,
-            end.x as i32,
-            end.y as i32,
-        );
-    });
+    CUBE_INDICIES
+        .iter()
+        .enumerate()
+        .for_each(|(index, triangle)| {
+            let a = GEOMETRY_BUFFER[triangle.0].xy();
+            let b = GEOMETRY_BUFFER[triangle.1].xy();
+            let c = GEOMETRY_BUFFER[triangle.2].xy();
+
+            let triangle = Triangle {
+                verticies: [a, b, c],
+            };
+
+            draw_triangle(triangle, game_state.colors[index]);
+        });
 
     // Clear our buffer fo rnext frame
     GEOMETRY_BUFFER.clear();
