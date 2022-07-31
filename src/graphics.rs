@@ -1,10 +1,4 @@
-use nalgebra::Vector2;
-
-use crate::{console::set_pixel, log};
-
-pub struct Triangle {
-    pub verticies: [Vector2<f32>; 3],
-}
+use crate::{console::set_pixel, types::Triangle};
 
 pub fn draw_triangle(mut triangle: Triangle, graphics_parameters: i32) {
     // Sort verts from top (low) to bottom (high)
