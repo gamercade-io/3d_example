@@ -14,15 +14,30 @@ pub struct GameState {
     pub screen_height: i32,
     pub dt: f32,
     pub colors: [i32; 64],
-    pub vertex_buffer: Box<[Vector3<f32>]>,
-    pub index_buffer: Box<[IndexedTriangle]>,
+    pub vertex_data: Box<[Vector3<f32>]>,
+    pub index_data: Box<[IndexedTriangle]>,
     pub roll: f32,
     pub pitch: f32,
     pub yaw: f32,
     pub offset_z: f32,
 }
 
+pub struct Gpu {
+    vertex_buffer: Vec<Vector3<f32>>,
+    index_buffer: Vec<IndexedTriangle>,
+    cull_flags: Vec<bool>,
+}
+
+impl Gpu {
+    fn clear(&mut self) {
+        self.vertex_buffer.clear();
+        self.index_buffer.clear();
+        self.cull_flags.clear();
+    }
+}
+
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
+static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
 
@@ -57,6 +72,7 @@ const CUBE_EDGES: [TriangleEdge; 12] = [
     TriangleEdge(6, 4),
 ];
 
+#[derive(Clone, Copy)]
 pub struct IndexedTriangle(usize, usize, usize);
 const CUBE_INDICIES: [IndexedTriangle; 12] = [
     IndexedTriangle(0, 2, 1),
@@ -69,7 +85,7 @@ const CUBE_INDICIES: [IndexedTriangle; 12] = [
     IndexedTriangle(4, 7, 6),
     IndexedTriangle(0, 4, 2),
     IndexedTriangle(2, 4, 6),
-    IndexedTriangle(0, 1, 2),
+    IndexedTriangle(0, 1, 4),
     IndexedTriangle(1, 5, 4),
 ];
 
@@ -97,8 +113,8 @@ pub unsafe extern "C" fn init() {
         screen_width: width(),
         screen_height: height(),
         dt: frame_time(),
-        vertex_buffer: Box::new(cube(SIDE)),
-        index_buffer: Box::new([]),
+        vertex_data: Box::new(cube(SIDE)),
+        index_data: Box::new(CUBE_INDICIES),
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
@@ -108,6 +124,12 @@ pub unsafe extern "C" fn init() {
             .collect::<Vec<_>>()
             .try_into()
             .unwrap(),
+    });
+
+    GPU.write(Gpu {
+        vertex_buffer: Vec::new(),
+        index_buffer: Vec::new(),
+        cull_flags: Vec::new(),
     });
 }
 
@@ -143,29 +165,53 @@ pub unsafe extern "C" fn update() {
 #[no_mangle]
 pub unsafe extern "C" fn draw() {
     // Some local working data
-    static mut GEOMETRY_BUFFER: Vec<Vector3<f32>> = Vec::new();
     let game_state = GAME_STATE.assume_init_ref();
+    let gpu = GPU.assume_init_mut();
 
     // Clear the screen every frame
     clear_screen(0);
 
     let rot = Rotation3::from_euler_angles(game_state.roll, game_state.pitch, game_state.yaw);
 
-    // Transform our geometry into screen space
-    GEOMETRY_BUFFER.extend(game_state.vertex_buffer.iter().map(|vertex| {
-        let mut vertex = rot * vertex;
-        vertex.z += game_state.offset_z;
-        to_screen_space(vertex, game_state)
-    }));
+    // Transform our geometry and push it into the gpu
+    gpu.vertex_buffer
+        .extend(game_state.vertex_data.iter().map(|vertex| {
+            let mut vertex = rot * vertex;
+            vertex.z += game_state.offset_z;
+            vertex
+        }));
+
+    // Build the index list, and check for backfacing tris
+    gpu.index_buffer
+        .extend(game_state.index_data.iter().map(|indicies| {
+            let verts = [
+                gpu.vertex_buffer[indicies.0],
+                gpu.vertex_buffer[indicies.1],
+                gpu.vertex_buffer[indicies.2],
+            ];
+
+            let cross_result = (verts[1] - verts[0]).cross(&(verts[2] - verts[0]));
+            let dot_result = cross_result.dot(&verts[0]);
+            let cull_flag = dot_result > 0.0;
+            gpu.cull_flags.push(cull_flag);
+
+            IndexedTriangle(indicies.0, indicies.1, indicies.2)
+        }));
+
+    // Convert the verticies to screen space
+    gpu.vertex_buffer.iter_mut().for_each(|vertex| {
+        *vertex = to_screen_space(*vertex, game_state);
+    });
 
     // Render our geometry
-    CUBE_INDICIES
+    gpu.index_buffer
         .iter()
         .enumerate()
+        .filter(|(index, _)| gpu.cull_flags[*index] == false)
         .for_each(|(index, triangle)| {
-            let a = GEOMETRY_BUFFER[triangle.0].xy();
-            let b = GEOMETRY_BUFFER[triangle.1].xy();
-            let c = GEOMETRY_BUFFER[triangle.2].xy();
+            let a = gpu.vertex_buffer[triangle.0].xy();
+            let b = gpu.vertex_buffer[triangle.1].xy();
+            let c = gpu.vertex_buffer[triangle.2].xy();
 
             let triangle = Triangle {
                 verticies: [a, b, c],
@@ -174,6 +220,6 @@ pub unsafe extern "C" fn draw() {
             draw_triangle(triangle, game_state.colors[index]);
         });
 
-    // Clear our buffer fo rnext frame
-    GEOMETRY_BUFFER.clear();
+    // Clear our buffers for next frame
+    gpu.clear()
 }
