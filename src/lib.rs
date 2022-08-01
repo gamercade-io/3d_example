@@ -17,17 +17,18 @@ pub struct GameState {
     pub screen_width: i32,
     pub screen_height: i32,
     pub dt: f32,
-    pub colors: [i32; 16 * 16 * 16],
+    pub colors: [i32; 32 * 32 * 16],
     pub vertex_data: Box<[Vector3<f32>]>,
     pub index_data: Box<[IndexedTriangle]>,
+    pub vertex_shader_inputs: Box<[Vector3<f32>]>,
     pub roll: f32,
     pub pitch: f32,
     pub yaw: f32,
-    pub offset_z: f32,
+    pub camera_position: Vector3<f32>,
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
+static mut GPU: MaybeUninit<Gpu<Vector3<f32>>> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
 
@@ -55,6 +56,8 @@ pub unsafe fn log(text: &str) {
     console_log(addr, text.len() as i32)
 }
 
+/// # Safety
+/// This function calls external Gamercade Api Functions
 #[no_mangle]
 pub unsafe extern "C" fn init() {
     GAME_STATE.write(GameState {
@@ -63,11 +66,22 @@ pub unsafe extern "C" fn init() {
         dt: frame_time(),
         vertex_data: Box::new(cube(SIDE)),
         index_data: Box::new(CUBE_INDICIES),
+        vertex_shader_inputs: CUBE_COLORS
+            .iter()
+            .map(|color| {
+                Vector3::new(
+                    color.r as f32 / 255.0,
+                    color.g as f32 / 255.0,
+                    color.b as f32 / 255.0,
+                )
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
-        offset_z: 2.0,
-        colors: (0..64)
+        camera_position: Vector3::new(0.0, 0.0, 2.0),
+        colors: (0..256)
             .flat_map(|palette| {
                 (0..64).map(move |color| graphics_parameters(palette, 0, 0, color, 0, 0))
             })
@@ -79,6 +93,8 @@ pub unsafe extern "C" fn init() {
     GPU.write(Gpu::default());
 }
 
+/// # Safety
+/// This function calls external Gamercade Api Functions
 #[no_mangle]
 pub unsafe extern "C" fn update() {
     let game_state = GAME_STATE.assume_init_mut();
@@ -102,12 +118,14 @@ pub unsafe extern "C" fn update() {
     }
 
     if button_c_held(0) != 0 {
-        game_state.offset_z += ROT_SPEED;
+        game_state.camera_position.z += ROT_SPEED;
     } else if button_d_held(0) != 0 {
-        game_state.offset_z -= ROT_SPEED;
+        game_state.camera_position.z -= ROT_SPEED;
     }
 }
 
+/// # Safety
+/// This function calls external Gamercade Api Functions
 #[no_mangle]
 pub unsafe extern "C" fn draw() {
     // Some local working data
@@ -117,11 +135,7 @@ pub unsafe extern "C" fn draw() {
     // Clear the screen every frame
     clear_screen(0);
 
-    // Prepare the data for rendering.
-    gpu.prepare_scene(game_state);
-
-    // Call draw etc
-    gpu.render(game_state);
+    gpu.render_scene(game_state);
 
     // Clear our buffers for next frame
     gpu.clear()

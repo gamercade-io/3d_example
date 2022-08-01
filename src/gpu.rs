@@ -2,99 +2,115 @@ use nalgebra::{Rotation3, Vector3};
 
 use crate::{
     graphics::draw_triangle,
-    types::{Color, IndexedTriangle, Triangle, TriangleEdge},
+    types::{Color, IndexedTriangle, Triangle, TriangleEdge, TriangleInner},
     GameState,
 };
 
 #[derive(Default)]
-pub struct Gpu {
-    vertex_buffer: Vec<Vector3<f32>>,
-    index_buffer: Vec<IndexedTriangle>,
-    cull_flags: Vec<bool>,
+pub struct Gpu<T> {
+    raw_vertex_buffer: Vec<Vector3<f32>>,
+    triangle_buffer: Vec<Triangle<T>>,
 }
 
-impl Gpu {
+impl Gpu<Vector3<f32>> {
     // Clears our buffers to use next frame
     pub fn clear(&mut self) {
-        self.vertex_buffer.clear();
-        self.index_buffer.clear();
-        self.cull_flags.clear();
+        self.raw_vertex_buffer.clear();
     }
 
     // Prepares the scene for drawing, including taking from the game state
     // the geometry, the index buffer, and converting them to screenspace.
-    pub fn prepare_scene(&mut self, game_state: &GameState) {
-        self.prepare_geometry(game_state);
-        self.prepare_index_buffer(game_state);
-        self.vertex_buffer_to_screen_space(game_state);
+    pub fn render_scene(&mut self, game_state: &GameState) {
+        self.process_verticies(game_state);
+        self.assemble_triangles(game_state);
+        self.process_triangles(game_state);
+        self.post_process_triangles(game_state);
+        self.render(game_state);
     }
 
-    fn prepare_geometry(&mut self, game_state: &GameState) {
+    // Prepares the verticies by appling any rotations and transformations
+    fn process_verticies(&mut self, game_state: &GameState) {
         let rot = Rotation3::from_euler_angles(game_state.roll, game_state.pitch, game_state.yaw);
 
         // Transform our geometry and push it into the gpu
-        self.vertex_buffer
+        self.raw_vertex_buffer
             .extend(game_state.vertex_data.iter().map(|vertex| {
                 let mut vertex = rot * vertex;
-                vertex.z += game_state.offset_z;
+                vertex += game_state.camera_position;
+
+                //TODO: Add vertex shader
                 vertex
             }));
     }
 
-    fn prepare_index_buffer(&mut self, game_state: &GameState) {
-        // Build the index list, and check for backfacing tris
-        self.index_buffer
-            .extend(game_state.index_data.iter().map(|indicies| {
-                let verts = [
-                    self.vertex_buffer[indicies.0],
-                    self.vertex_buffer[indicies.1],
-                    self.vertex_buffer[indicies.2],
-                ];
+    // Build the index list, will filter out backfacing triangles
+    fn assemble_triangles(&mut self, game_state: &GameState) {
+        self.triangle_buffer
+            .extend(game_state.index_data.iter().filter_map(|indexed_triangle| {
+                let a = self.raw_vertex_buffer[indexed_triangle.0];
+                let b = self.raw_vertex_buffer[indexed_triangle.1];
+                let c = self.raw_vertex_buffer[indexed_triangle.2];
 
-                let cross_result = (verts[1] - verts[0]).cross(&(verts[2] - verts[0]));
-                let dot_result = cross_result.dot(&verts[0]);
+                let cross_result = (b - a).cross(&(c - a));
+                let dot_result = cross_result.dot(&a);
                 let cull_flag = dot_result > 0.0;
-                self.cull_flags.push(cull_flag);
+                if cull_flag {
+                    None
+                } else {
+                    // This triangle is valid, so we also want to enqueue the extra vertex parameters
+                    let a_params = game_state.vertex_shader_inputs[indexed_triangle.0];
+                    let b_params = game_state.vertex_shader_inputs[indexed_triangle.1];
+                    let c_params = game_state.vertex_shader_inputs[indexed_triangle.2];
 
-                IndexedTriangle(indicies.0, indicies.1, indicies.2)
+                    let verticies = [
+                        TriangleInner {
+                            position: a,
+                            parameters: a_params,
+                        },
+                        TriangleInner {
+                            position: b,
+                            parameters: b_params,
+                        },
+                        TriangleInner {
+                            position: c,
+                            parameters: c_params,
+                        },
+                    ];
+
+                    Some(Triangle { verticies })
+                }
             }));
     }
 
-    fn vertex_buffer_to_screen_space(&mut self, game_state: &GameState) {
+    fn process_triangles(&mut self, game_state: &GameState) {
         // Convert the verticies to screen space
-        self.vertex_buffer.iter_mut().for_each(|vertex| {
-            *vertex = to_screen_space(*vertex, game_state);
+        self.triangle_buffer.iter_mut().for_each(|triangle| {
+            triangle
+                .verticies
+                .iter_mut()
+                .for_each(|vertex| *vertex.position = *to_screen_space(vertex.position, game_state))
         });
     }
 
+    fn post_process_triangles(&mut self, _game_state: &GameState) {
+        //TODO:
+    }
+
     /// Actually go and render the geometry
-    pub fn render(&self, game_state: &GameState) {
+    fn render(&mut self, game_state: &GameState) {
         // Render our geometry
-        self.index_buffer
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| self.cull_flags[*index] == false)
-            .for_each(|(index, triangle)| {
-                let a = self.vertex_buffer[triangle.0].xy();
-                let b = self.vertex_buffer[triangle.1].xy();
-                let c = self.vertex_buffer[triangle.2].xy();
-
-                let triangle = Triangle {
-                    verticies: [a, b, c],
-                };
-
-                draw_triangle(triangle, game_state.colors[index]);
-            });
+        self.triangle_buffer.drain(..).for_each(|triangle| {
+            draw_triangle(triangle, game_state);
+        });
     }
 }
 
-fn to_screen_space(vec: Vector3<f32>, game_state: &GameState) -> Vector3<f32> {
-    let z_inv = vec.z.recip();
-    let x = (vec.x * z_inv + 1.0) * (game_state.screen_width as f32 / 2.0);
-    let y = (-vec.y * z_inv + 1.0) * (game_state.screen_height as f32 / 2.0);
-    let z = vec.z;
+fn to_screen_space(mut vec: Vector3<f32>, game_state: &GameState) -> Vector3<f32> {
+    let z_inv = vec[2].recip();
+    vec[0] = (vec[0] * z_inv + 1.0) * (game_state.screen_width as f32 / 2.0);
+    vec[1] = (-vec[1] * z_inv + 1.0) * (game_state.screen_height as f32 / 2.0);
 
-    Vector3::new(x, y, z)
+    vec
 }
 
 pub const CUBE_EDGES: [TriangleEdge; 12] = [
@@ -127,7 +143,7 @@ pub const CUBE_INDICIES: [IndexedTriangle; 12] = [
     IndexedTriangle(1, 5, 4),
 ];
 
-const CUBE_COLORS: [Color; 8] = [
+pub const CUBE_COLORS: [Color; 8] = [
     Color::new(0, 0, 0xFF),
     Color::new(0, 0xFF, 0),
     Color::new(0, 0xFF, 0xFF),
