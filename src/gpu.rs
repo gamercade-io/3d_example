@@ -1,18 +1,22 @@
-use nalgebra::{Rotation3, Vector3};
+use std::marker::PhantomData;
+
+use nalgebra::{Rotation3, SVector, Vector3};
 
 use crate::{
+    fragment_shader::FragmentShader,
     graphics::draw_triangle,
-    types::{Color, IndexedTriangle, Triangle, TriangleEdge, TriangleInner},
+    types::{Color, IndexedTriangle, Triangle, TriangleEdge, TriangleVertex},
     GameState,
 };
 
 #[derive(Default)]
-pub struct Gpu<T> {
+pub struct Gpu<FS: FragmentShader<D>, const D: usize> {
     raw_vertex_buffer: Vec<Vector3<f32>>,
-    triangle_buffer: Vec<Triangle<T>>,
+    triangle_buffer: Vec<Triangle<D>>,
+    fragment_shader: PhantomData<FS>,
 }
 
-impl Gpu<Vector3<f32>> {
+impl<FS: FragmentShader<D>, const D: usize> Gpu<FS, D> {
     // Clears our buffers to use next frame
     pub fn clear(&mut self) {
         self.raw_vertex_buffer.clear();
@@ -58,22 +62,25 @@ impl Gpu<Vector3<f32>> {
                     None
                 } else {
                     // This triangle is valid, so we also want to enqueue the extra vertex parameters
-                    let a_params = game_state.vertex_shader_inputs[indexed_triangle.0];
-                    let b_params = game_state.vertex_shader_inputs[indexed_triangle.1];
-                    let c_params = game_state.vertex_shader_inputs[indexed_triangle.2];
+                    let a_params = &game_state.vertex_shader_inputs
+                        [indexed_triangle.0 * D..(indexed_triangle.0 * D) + D];
+                    let b_params = &game_state.vertex_shader_inputs
+                        [indexed_triangle.1 * D..(indexed_triangle.1 * D) + D];
+                    let c_params = &game_state.vertex_shader_inputs
+                        [indexed_triangle.2 * D..(indexed_triangle.2 * D) + D];
 
                     let verticies = [
-                        TriangleInner {
+                        TriangleVertex {
                             position: a,
-                            parameters: a_params,
+                            parameters: SVector::<f32, D>::from_column_slice(a_params),
                         },
-                        TriangleInner {
+                        TriangleVertex {
                             position: b,
-                            parameters: b_params,
+                            parameters: SVector::<f32, D>::from_column_slice(b_params),
                         },
-                        TriangleInner {
+                        TriangleVertex {
                             position: c,
-                            parameters: c_params,
+                            parameters: SVector::<f32, D>::from_column_slice(c_params),
                         },
                     ];
 
@@ -88,7 +95,7 @@ impl Gpu<Vector3<f32>> {
             triangle
                 .verticies
                 .iter_mut()
-                .for_each(|vertex| *vertex.position = *to_screen_space(vertex.position, game_state))
+                .for_each(|vertex| to_screen_space(vertex, game_state))
         });
     }
 
@@ -100,17 +107,20 @@ impl Gpu<Vector3<f32>> {
     fn render(&mut self, game_state: &GameState) {
         // Render our geometry
         self.triangle_buffer.drain(..).for_each(|triangle| {
-            draw_triangle(triangle, game_state);
+            draw_triangle::<FS, D>(triangle, game_state);
         });
     }
 }
 
-fn to_screen_space(mut vec: Vector3<f32>, game_state: &GameState) -> Vector3<f32> {
-    let z_inv = vec[2].recip();
-    vec[0] = (vec[0] * z_inv + 1.0) * (game_state.screen_width as f32 / 2.0);
-    vec[1] = (-vec[1] * z_inv + 1.0) * (game_state.screen_height as f32 / 2.0);
+fn to_screen_space<const D: usize>(vertex: &mut TriangleVertex<D>, game_state: &GameState) {
+    let z_inverse = vertex.position.z.recip();
 
-    vec
+    *vertex *= z_inverse;
+
+    vertex.position.x = (vertex.position.x + 1.0) * (game_state.screen_width as f32 / 2.0);
+    vertex.position.y = (-vertex.position.y + 1.0) * (game_state.screen_height as f32 / 2.0);
+
+    vertex.position.z = z_inverse;
 }
 
 pub const CUBE_EDGES: [TriangleEdge; 12] = [
@@ -152,4 +162,15 @@ pub const CUBE_COLORS: [Color; 8] = [
     Color::new(0xFF, 0xFF, 0),
     Color::new(0xFF, 0xFF, 0xFF),
     Color::new(0xFF, 0, 0xFF),
+];
+
+pub const CUBE_UVS: [[f32; 2]; 8] = [
+    [0.0, 1.0],
+    [1.0, 1.0],
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [1.0, 1.0],
+    [0.0, 1.0],
+    [1.0, 0.0],
+    [0.0, 0.0],
 ];

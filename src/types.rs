@@ -1,6 +1,6 @@
-use std::ops::{AddAssign, Div, Mul, Sub};
+use std::ops::{AddAssign, Div, Mul, MulAssign, Sub};
 
-use nalgebra::Vector3;
+use nalgebra::{SVector, Vector3};
 
 pub struct TriangleEdge(pub usize, pub usize);
 
@@ -36,62 +36,57 @@ impl Color {
     }
 }
 
-pub struct Triangle<T> {
-    pub verticies: [TriangleInner<T>; 3],
+pub struct Triangle<const D: usize> {
+    pub verticies: [TriangleVertex<D>; 3],
 }
 
 #[derive(Clone, Copy)]
-pub struct TriangleInner<T> {
+pub struct TriangleVertex<const D: usize> {
     pub position: Vector3<f32>,
-    pub parameters: T,
+    pub parameters: SVector<f32, D>,
 }
 
-impl<T> Sub for TriangleInner<T>
-where
-    T: Sub + Sub<Output = T>,
-{
+impl<const D: usize> Sub for TriangleVertex<D> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        TriangleInner {
+        TriangleVertex {
             position: self.position - rhs.position,
             parameters: self.parameters - rhs.parameters,
         }
     }
 }
 
-impl<T> Div<f32> for TriangleInner<T>
-where
-    T: Div<f32> + Div<f32, Output = T>,
-{
+impl<const D: usize> Div<f32> for TriangleVertex<D> {
     type Output = Self;
 
     fn div(self, rhs: f32) -> Self::Output {
-        TriangleInner {
+        TriangleVertex {
             position: self.position / rhs,
             parameters: self.parameters / rhs,
         }
     }
 }
 
-impl<T> Mul<f32> for TriangleInner<T>
-where
-    T: Mul<f32> + Mul<f32, Output = T>,
-{
+impl<const D: usize> Mul<f32> for TriangleVertex<D> {
     type Output = Self;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        TriangleInner {
+        TriangleVertex {
             position: self.position * rhs,
             parameters: self.parameters * rhs,
         }
     }
 }
 
-impl<T> AddAssign for TriangleInner<T>
-where
-    T: AddAssign,
-{
+impl<const D: usize> MulAssign<f32> for TriangleVertex<D> {
+    fn mul_assign(&mut self, rhs: f32) {
+        self.position *= rhs;
+        self.parameters *= rhs;
+    }
+}
+
+impl<const D: usize> AddAssign for TriangleVertex<D> {
     fn add_assign(&mut self, rhs: Self) {
         self.position += rhs.position;
         self.parameters += rhs.parameters;

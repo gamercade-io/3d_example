@@ -1,5 +1,6 @@
 use std::{f32::consts::PI, mem::MaybeUninit};
 
+use fragment_shader::{ColorBlend, Textured};
 use nalgebra::Vector3;
 
 mod console;
@@ -15,6 +16,8 @@ mod fragment_shader;
 mod types;
 use types::IndexedTriangle;
 
+mod image;
+
 pub struct GameState {
     pub screen_width: i32,
     pub screen_height: i32,
@@ -22,7 +25,7 @@ pub struct GameState {
     pub colors: [i32; 32 * 32 * 16],
     pub vertex_data: Box<[Vector3<f32>]>,
     pub index_data: Box<[IndexedTriangle]>,
-    pub vertex_shader_inputs: Box<[Vector3<f32>]>,
+    pub vertex_shader_inputs: Box<[f32]>,
     pub roll: f32,
     pub pitch: f32,
     pub yaw: f32,
@@ -30,7 +33,7 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut GPU: MaybeUninit<Gpu<Vector3<f32>>> = MaybeUninit::uninit();
+static mut GPU: MaybeUninit<Gpu<Textured, 2>> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
 
@@ -47,6 +50,28 @@ fn cube(size: f32) -> [Vector3<f32>; 8] {
         Vector3::new(-side, side, side),
         Vector3::new(side, side, side),
     ]
+}
+
+fn cube_colors() -> Box<[f32]> {
+    CUBE_COLORS
+        .iter()
+        .flat_map(|color| {
+            [
+                color.r as f32 / 255.0,
+                color.g as f32 / 255.0,
+                color.b as f32 / 255.0,
+            ]
+        })
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
+}
+
+fn cube_uvs() -> Box<[f32]> {
+    CUBE_UVS
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .into_boxed_slice()
 }
 
 /// # Safety
@@ -68,17 +93,7 @@ pub unsafe extern "C" fn init() {
         dt: frame_time(),
         vertex_data: Box::new(cube(SIDE)),
         index_data: Box::new(CUBE_INDICIES),
-        vertex_shader_inputs: CUBE_COLORS
-            .iter()
-            .map(|color| {
-                Vector3::new(
-                    color.r as f32 / 255.0,
-                    color.g as f32 / 255.0,
-                    color.b as f32 / 255.0,
-                )
-            })
-            .collect::<Vec<_>>()
-            .into_boxed_slice(),
+        vertex_shader_inputs: cube_uvs(),
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
