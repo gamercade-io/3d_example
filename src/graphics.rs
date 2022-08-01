@@ -1,8 +1,9 @@
 use nalgebra::Vector3;
 
 use crate::{
-    console::set_pixel,
-    types::{Color, Triangle, TriangleInner},
+    fragment_shader::{ColorBlend, FragmentShader},
+    set_pixel,
+    types::{Triangle, TriangleInner},
     GameState,
 };
 
@@ -122,8 +123,7 @@ fn draw_flat_triangle(
 
         (x_start..x_end).for_each(|x| unsafe {
             //TODO: Check ZBuffer
-            let color_index =
-                vertex_color_shader(interpolation_line.parameters).to_554_index();
+            let color_index = ColorBlend::frag(interpolation_line.parameters).to_554_index();
             set_pixel(game_state.colors[color_index], x, y);
 
             interpolation_line += delta_interpolation_line;
@@ -132,12 +132,4 @@ fn draw_flat_triangle(
         interpolator_edge_0 += dv0;
         interpolator_edge_1 += dv1;
     });
-}
-
-fn vertex_color_shader(shader_params: Vector3<f32>) -> Color {
-    Color {
-        r: (shader_params.x * 255.0) as u8,
-        g: (shader_params.y * 255.0) as u8,
-        b: (shader_params.z * 255.0) as u8,
-    }
 }

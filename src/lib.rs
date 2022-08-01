@@ -10,6 +10,8 @@ mod graphics;
 mod gpu;
 use gpu::*;
 
+mod fragment_shader;
+
 mod types;
 use types::IndexedTriangle;
 
