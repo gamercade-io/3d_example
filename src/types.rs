@@ -4,7 +4,6 @@ use nalgebra::{SVector, Vector3};
 
 pub struct TriangleEdge(pub usize, pub usize);
 
-#[derive(Clone, Copy)]
 pub struct IndexedTriangle(pub usize, pub usize, pub usize);
 
 #[derive(Clone, Copy)]
@@ -14,30 +13,33 @@ pub struct Color {
     pub b: u8,
 }
 
+// static mut COLOR_LOOKUP: MaybeUninit<[i32; 32 * 32 * 16]> = MaybeUninit::uninit();
+
 impl Color {
     pub const fn new(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b }
     }
 
-    pub fn to_4bit_index(self) -> usize {
-        let r = self.r as usize / 17;
-        let g = self.g as usize / 17;
-        let b = self.b as usize / 17;
+    pub fn to_graphics_params(self) -> i32 {
+        use gamercade_rs::GraphicsParameters;
+        let a_level = self.r / 8;
+        let g_level = self.g / 8;
+        let b_level = self.b / 16;
 
-        (r * 256) + (g * 16) + b
-    }
+        let g_palette = g_level / 4;
+        let g_color = (g_level % 4) * 16;
 
-    pub fn to_554_index(self) -> usize {
-        let r = self.r as usize / 8;
-        let g = self.g as usize / 8;
-        let b = self.b as usize / 17;
+        let r_palette = a_level * 8;
 
-        (r * 512) + (g * 16) + b
+        GraphicsParameters::default()
+            .palette_index(r_palette + g_palette as u8)
+            .color_index(g_color + b_level as u8)
+            .into()
     }
 }
 
 pub struct Triangle<const D: usize> {
-    pub verticies: [TriangleVertex<D>; 3],
+    pub vertices: [TriangleVertex<D>; 3],
 }
 
 #[derive(Clone, Copy)]
@@ -90,32 +92,5 @@ impl<const D: usize> AddAssign for TriangleVertex<D> {
     fn add_assign(&mut self, rhs: Self) {
         self.position += rhs.position;
         self.parameters += rhs.parameters;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Color;
-
-    #[test]
-    fn test_554_color() {
-        let max = Color {
-            r: 255,
-            g: 255,
-            b: 255,
-        };
-
-        assert_eq!(max.to_554_index(), 2 ^ 14 - 1);
-    }
-
-    #[test]
-    fn test_4bit_color() {
-        let max = Color {
-            r: 255,
-            g: 255,
-            b: 255,
-        };
-
-        assert_eq!(max.to_4bit_index(), 2 ^ 16 - 1);
     }
 }

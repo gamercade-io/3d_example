@@ -1,31 +1,31 @@
+use nalgebra::{Rotation3, Vector3};
+use pipeline::Pipeline;
 use std::{f32::consts::PI, mem::MaybeUninit};
-
-use fragment_shader::{ColorBlend, Textured};
-use nalgebra::Vector3;
 
 mod console;
 use console::*;
 
 mod graphics;
 
-mod gpu;
-use gpu::*;
 
-mod fragment_shader;
+mod shaders;
 
 mod types;
-use types::IndexedTriangle;
+use shaders::{ColorBlend, DefaultGeometryShader, DefaultVertexShader, Textured};
+use shapes::{cube, CUBE_indices, CUBE_COLORS, CUBE_UVS, SIDE};
+use types::{IndexedTriangle, TriangleVertex};
 
 mod image;
+mod shapes;
+
+mod pipeline;
 
 pub struct GameState {
-    pub screen_width: i32,
-    pub screen_height: i32,
+    pub screen_width: u32,
+    pub screen_height: u32,
     pub dt: f32,
-    pub colors: [i32; 32 * 32 * 16],
-    pub vertex_data: Box<[Vector3<f32>]>,
+    pub vertex_data: Box<[TriangleVertex<3>]>,
     pub index_data: Box<[IndexedTriangle]>,
-    pub vertex_shader_inputs: Box<[f32]>,
     pub roll: f32,
     pub pitch: f32,
     pub yaw: f32,
@@ -33,46 +33,9 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut GPU: MaybeUninit<Gpu<Textured, 2>> = MaybeUninit::uninit();
+static mut PIPELINE: MaybeUninit<Pipeline<3, 3, 3>> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
-
-const SIDE: f32 = 1.0;
-fn cube(size: f32) -> [Vector3<f32>; 8] {
-    let side = size * 0.5;
-    [
-        Vector3::new(-side, -side, -side),
-        Vector3::new(side, -side, -side),
-        Vector3::new(-side, side, -side),
-        Vector3::new(side, side, -side),
-        Vector3::new(-side, -side, side),
-        Vector3::new(side, -side, side),
-        Vector3::new(-side, side, side),
-        Vector3::new(side, side, side),
-    ]
-}
-
-fn cube_colors() -> Box<[f32]> {
-    CUBE_COLORS
-        .iter()
-        .flat_map(|color| {
-            [
-                color.r as f32 / 255.0,
-                color.g as f32 / 255.0,
-                color.b as f32 / 255.0,
-            ]
-        })
-        .collect::<Vec<_>>()
-        .into_boxed_slice()
-}
-
-fn cube_uvs() -> Box<[f32]> {
-    CUBE_UVS
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .into_boxed_slice()
-}
 
 /// # Safety
 /// This function calls external Gamercade Api Functions
@@ -87,27 +50,46 @@ pub unsafe fn log(text: &str) {
 /// This function calls external Gamercade Api Functions
 #[no_mangle]
 pub unsafe extern "C" fn init() {
+    let vertex_data_uvs = cube(SIDE)
+        .into_iter()
+        .zip(CUBE_UVS.into_iter())
+        .map(|(position, uvs)| TriangleVertex {
+            position,
+            parameters: uvs,
+        })
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+
+    let vertex_data_colored = cube(SIDE)
+        .into_iter()
+        .zip(CUBE_COLORS.into_iter())
+        .map(|(position, color)| TriangleVertex {
+            position,
+            parameters: color,
+        })
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+
+    let screen_width = width() as u32;
+    let screen_height = height() as u32;
+
+    PIPELINE.write(Pipeline::new(screen_width, screen_height));
+
     GAME_STATE.write(GameState {
-        screen_width: width(),
-        screen_height: height(),
+        screen_width,
+        screen_height,
         dt: frame_time(),
-        vertex_data: Box::new(cube(SIDE)),
-        index_data: Box::new(CUBE_INDICIES),
-        vertex_shader_inputs: cube_uvs(),
+        vertex_data: vertex_data_colored,
+        index_data: Box::new(CUBE_indices),
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
         camera_position: Vector3::new(0.0, 0.0, 2.0),
-        colors: (0..256)
-            .flat_map(|palette| {
-                (0..64).map(move |color| graphics_parameters(palette, 0, 0, color, 0, 0))
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap(),
     });
 
-    GPU.write(Gpu::default());
+    // Color::init_lookup();
+
+    //GPU.write(Gpu::default());
 }
 
 /// # Safety
@@ -139,6 +121,13 @@ pub unsafe extern "C" fn update() {
     } else if button_d_held(0) != 0 {
         game_state.camera_position.z -= ROT_SPEED;
     }
+
+    DefaultVertexShader::bind_camera_position(game_state.camera_position);
+    DefaultVertexShader::bind_rotation(Rotation3::from_euler_angles(
+        game_state.roll,
+        game_state.pitch,
+        game_state.yaw,
+    ))
 }
 
 /// # Safety
@@ -147,13 +136,13 @@ pub unsafe extern "C" fn update() {
 pub unsafe extern "C" fn draw() {
     // Some local working data
     let game_state = GAME_STATE.assume_init_ref();
-    let gpu = GPU.assume_init_mut();
+    let pipeline = PIPELINE.assume_init_mut();
 
     // Clear the screen every frame
     clear_screen(0);
 
-    gpu.render_scene(game_state);
-
-    // Clear our buffers for next frame
-    gpu.clear()
+    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, ColorBlend>(
+        &game_state.vertex_data,
+        &game_state.index_data,
+    );
 }
