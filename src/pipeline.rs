@@ -67,13 +67,6 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
                 .map(|triangle| GS::run(triangle)),
         );
 
-        let eye_position: Vector4<f32> = vertex_shader::get_projection_matrix()
-            .as_matrix()
-            .transform_point(&Point3::new(0.0, 0.0, 0.0))
-            .into();
-
-        let eye_position = eye_position.xyz();
-
         // Do backface Culling
         self.ps_input.retain(|triangle| {
             let a = triangle.vertices[0].position.xyz();
@@ -81,7 +74,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             let c = triangle.vertices[2].position.xyz();
 
             let cross_result = (b - a).cross(&(c - a));
-            let dot_compare = a - eye_position;
+            let dot_compare = a;
             let dot_result = cross_result.dot(&dot_compare);
             dot_result < 0.0
         });
