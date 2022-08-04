@@ -1,6 +1,6 @@
-use nalgebra::{Vector2, Vector3};
+use nalgebra::{Point3, Vector2, Vector3};
 
-use crate::types::{Color, IndexedTriangle, TriangleEdge};
+use crate::types::{IndexedTriangle, TriangleEdge};
 
 pub const CUBE_EDGES: [TriangleEdge; 12] = [
     TriangleEdge(0, 1),
@@ -17,7 +17,7 @@ pub const CUBE_EDGES: [TriangleEdge; 12] = [
     TriangleEdge(6, 4),
 ];
 
-pub const CUBE_indices: [IndexedTriangle; 12] = [
+pub const CUBE_INCIDES: [IndexedTriangle; 12] = [
     IndexedTriangle(0, 2, 1),
     IndexedTriangle(2, 3, 1),
     IndexedTriangle(1, 3, 5),
@@ -55,16 +55,16 @@ pub const CUBE_UVS: [Vector2<f32>; 8] = [
 ];
 
 pub const SIDE: f32 = 1.0;
-pub fn cube(size: f32) -> [Vector3<f32>; 8] {
+pub fn cube(size: f32) -> [Point3<f32>; 8] {
     let side = size * 0.5;
     [
-        Vector3::new(-side, -side, -side),
-        Vector3::new(side, -side, -side),
-        Vector3::new(-side, side, -side),
-        Vector3::new(side, side, -side),
-        Vector3::new(-side, -side, side),
-        Vector3::new(side, -side, side),
-        Vector3::new(-side, side, side),
-        Vector3::new(side, side, side),
+        Point3::new(-side, -side, -side),
+        Point3::new(side, -side, -side),
+        Point3::new(-side, side, -side),
+        Point3::new(side, side, -side),
+        Point3::new(-side, -side, side),
+        Point3::new(side, -side, side),
+        Point3::new(-side, side, side),
+        Point3::new(side, side, side),
     ]
 }

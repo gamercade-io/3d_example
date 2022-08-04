@@ -1,4 +1,6 @@
-use crate::{log, types::Color};
+use gamercade_rs::text::console_log;
+
+use crate::types::Color;
 
 pub const IMAGE_WIDTH: usize = 64;
 pub const IMAGE_HEIGHT: usize = 64;
@@ -22,11 +24,11 @@ pub fn get_image() -> &'static [Color; IMAGE_PIXEL_COUNT] {
                 .try_into()
             {
                 Ok(v) => {
-                    log("texture generated");
+                    console_log("texture generated");
                     v
                 }
                 Err(_) => {
-                    log("failed to generate image");
+                    console_log("failed to generate image");
                     panic!();
                 }
             }

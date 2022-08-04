@@ -1,7 +1,7 @@
 use crate::{
     graphics::draw_triangle,
     shaders::{GeometryShader, PixelShader, VertexShader},
-    types::{IndexedTriangle, Triangle, TriangleVertex},
+    types::{IndexedTriangle, RawPoint, Triangle, TriangleVertex},
 };
 
 pub struct Pipeline<const VSIN: usize, const GSIN: usize, const PSIN: usize> {
@@ -29,7 +29,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
         PS: PixelShader<PSIN>,
     >(
         &mut self,
-        raw_vertices: &[TriangleVertex<VSIN>],
+        raw_vertices: &[RawPoint<VSIN>],
         raw_indices: &[IndexedTriangle],
     ) {
         // Clear the buffers
@@ -38,7 +38,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
         // Process vertices by applying the Vertex Shader
         // to each vertex, and storing their output in gs_input
         self.gs_input
-            .extend(raw_vertices.iter().map(|vertex| VS::run(*vertex)));
+            .extend(raw_vertices.iter().map(|raw_vertex| VS::run(*raw_vertex)));
 
         // Assemble our triangles, using indices
         // and place them into the triangle buffer.
@@ -63,9 +63,9 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
 
         // Do backface Culling
         self.ps_input.retain(|triangle| {
-            let a = triangle.vertices[0].position;
-            let b = triangle.vertices[1].position;
-            let c = triangle.vertices[2].position;
+            let a = triangle.vertices[0].position.xyz();
+            let b = triangle.vertices[1].position.xyz();
+            let c = triangle.vertices[2].position.xyz();
 
             let cross_result = (b - a).cross(&(c - a));
             let dot_result = cross_result.dot(&a);

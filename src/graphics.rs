@@ -1,8 +1,9 @@
 use crate::{
-    set_pixel,
     shaders::PixelShader,
     types::{Triangle, TriangleVertex},
 };
+
+use gamercade_rs::prelude as gc;
 
 pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(mut triangle: Triangle<D>) {
     // Sort verts from top (low) to bottom (high)
@@ -105,13 +106,12 @@ fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
         interpolation_line +=
             delta_interpolation_line * (x_start as f32 + 0.5 - interpolator_edge_0.position.x);
 
-        (x_start..x_end).for_each(|x| unsafe {
+        (x_start..x_end).for_each(|x| {
             let z = interpolation_line.position.z.recip();
             let params = interpolation_line.parameters * z;
             //TODO: Add Check ZBuffer
             let color = PS::run(params).to_graphics_params();
-            //let color = game_state.colors[color_index];
-            set_pixel(color, x, y);
+            gc::set_pixel(color, x, y);
 
             interpolation_line += delta_interpolation_line;
         });
