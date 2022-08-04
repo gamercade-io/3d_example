@@ -1,6 +1,8 @@
-use nalgebra::{Point3, Vector4};
+use gamercade_rs::text::console_log;
+use nalgebra::{Point3, Vector3, Vector4};
 
 use crate::{
+    gpu::ZBuffer,
     graphics::draw_triangle,
     shaders::{vertex_shader, GeometryShader, PixelShader, VertexShader},
     types::{IndexedTriangle, RawPoint, Triangle, TriangleVertex},
@@ -11,12 +13,12 @@ pub struct Pipeline<const VSIN: usize, const GSIN: usize, const PSIN: usize> {
     triangle_buffer: Vec<Triangle<GSIN>>,
     ps_input: Vec<Triangle<PSIN>>,
 
-    screen_width: u32,
-    screen_height: u32,
+    screen_width: usize,
+    screen_height: usize,
 }
 
 impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSIN, PSIN> {
-    pub fn new(screen_width: u32, screen_height: u32) -> Self {
+    pub fn new(screen_width: usize, screen_height: usize) -> Self {
         Self {
             screen_width,
             screen_height,
@@ -34,6 +36,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
         &mut self,
         raw_vertices: &[RawPoint<VSIN>],
         raw_indices: &[IndexedTriangle],
+        depth_buffer: &mut ZBuffer,
     ) {
         // Clear the buffers
         self.gs_input.clear();
@@ -93,17 +96,18 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
 
         // Rasterize the triangles
         self.ps_input.drain(..).for_each(|triangle| {
-            draw_triangle::<PS, PSIN>(triangle);
+            draw_triangle::<PS, PSIN>(triangle, depth_buffer);
         });
     }
 }
 
 fn to_ndc<const PSIN: usize>(
     vertex: &mut TriangleVertex<PSIN>,
-    screen_width: u32,
-    screen_height: u32,
+    screen_width: usize,
+    screen_height: usize,
 ) {
     let w_inverse = vertex.position.w.recip();
+    *vertex *= w_inverse;
 
     vertex.position.x = (vertex.position.x + 1.0) * (screen_width as f32 / 2.0);
     vertex.position.y = (-vertex.position.y + 1.0) * (screen_height as f32 / 2.0);
