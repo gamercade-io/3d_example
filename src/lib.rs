@@ -2,6 +2,7 @@ use gamercade_rs::prelude as gc;
 use gamercade_rs::raw;
 use nalgebra::{Rotation3, Transform3, Translation3, Vector3};
 use pipeline::Pipeline;
+use shaders::{vertex_shader, ColorBlend, DefaultGeometryShader, DefaultVertexShader};
 use std::{f32::consts::PI, mem::MaybeUninit};
 
 mod graphics;
@@ -11,7 +12,6 @@ mod shapes;
 mod types;
 
 mod pipeline;
-use shaders::{ColorBlend, DefaultGeometryShader, DefaultVertexShader, Textured};
 use shapes::{cube, CUBE_COLORS, CUBE_INCIDES, CUBE_UVS, SIDE};
 use types::{IndexedTriangle, RawPoint};
 
@@ -61,6 +61,9 @@ pub unsafe extern "C" fn init() {
 
     PIPELINE.write(Pipeline::new(screen_width, screen_height));
 
+    vertex_shader::bind_model_matrix(Transform3::identity());
+    vertex_shader::init_projection(screen_width, screen_height);
+
     GAME_STATE.write(GameState {
         screen_width,
         screen_height,
@@ -104,11 +107,11 @@ pub unsafe extern "C" fn update() {
         game_state.camera_position.z -= ROT_SPEED;
     }
 
-    let transform = Transform3::identity()
+    let view = Transform3::identity()
         * Translation3::from(game_state.camera_position)
         * Rotation3::from_euler_angles(game_state.roll, game_state.pitch, game_state.yaw);
 
-    DefaultVertexShader::bind_transform(transform)
+    vertex_shader::bind_view_matrix(view);
 }
 
 /// # Safety

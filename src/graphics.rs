@@ -1,5 +1,5 @@
 use crate::{
-    shaders::PixelShader,
+    shaders::pixel_shader::PixelShader,
     types::{Triangle, TriangleVertex},
 };
 
@@ -107,11 +107,13 @@ fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
             delta_interpolation_line * (x_start as f32 + 0.5 - interpolator_edge_0.position.x);
 
         (x_start..x_end).for_each(|x| {
-            let z = interpolation_line.position.z.recip();
-            let params = interpolation_line.parameters * z;
-            //TODO: Add Check ZBuffer
-            let color = PS::run(params).to_graphics_params();
-            gc::set_pixel(color, x, y);
+            // TODO: Add Z Buffer check
+            if true {
+                let w = interpolation_line.position.w.recip();
+                let params = interpolation_line.parameters * w;
+                let color = PS::run(params).to_graphics_params();
+                gc::set_pixel(color, x, y);
+            }
 
             interpolation_line += delta_interpolation_line;
         });

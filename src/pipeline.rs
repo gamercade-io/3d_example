@@ -1,6 +1,8 @@
+use nalgebra::{Point3, Vector4};
+
 use crate::{
     graphics::draw_triangle,
-    shaders::{GeometryShader, PixelShader, VertexShader},
+    shaders::{vertex_shader, GeometryShader, PixelShader, VertexShader},
     types::{IndexedTriangle, RawPoint, Triangle, TriangleVertex},
 };
 
@@ -8,6 +10,7 @@ pub struct Pipeline<const VSIN: usize, const GSIN: usize, const PSIN: usize> {
     gs_input: Vec<TriangleVertex<GSIN>>,
     triangle_buffer: Vec<Triangle<GSIN>>,
     ps_input: Vec<Triangle<PSIN>>,
+
     screen_width: u32,
     screen_height: u32,
 }
@@ -61,6 +64,13 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
                 .map(|triangle| GS::run(triangle)),
         );
 
+        let eye_position: Vector4<f32> = vertex_shader::get_projection_matrix()
+            .as_matrix()
+            .transform_point(&Point3::new(0.0, 0.0, 0.0))
+            .into();
+
+        let eye_position = eye_position.xyz();
+
         // Do backface Culling
         self.ps_input.retain(|triangle| {
             let a = triangle.vertices[0].position.xyz();
@@ -68,9 +78,9 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             let c = triangle.vertices[2].position.xyz();
 
             let cross_result = (b - a).cross(&(c - a));
-            let dot_result = cross_result.dot(&a);
-            let cull_flag = dot_result > 0.0;
-            !cull_flag
+            let dot_compare = a - eye_position;
+            let dot_result = cross_result.dot(&dot_compare);
+            dot_result <= 0.0
         });
 
         //Convert the verts into screen space
@@ -78,7 +88,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             triangle
                 .vertices
                 .iter_mut()
-                .for_each(|vertex| to_screen_space(vertex, self.screen_width, self.screen_height));
+                .for_each(|vertex| to_ndc(vertex, self.screen_width, self.screen_height));
         });
 
         // Rasterize the triangles
@@ -88,17 +98,15 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
     }
 }
 
-fn to_screen_space<const PSIN: usize>(
+fn to_ndc<const PSIN: usize>(
     vertex: &mut TriangleVertex<PSIN>,
     screen_width: u32,
     screen_height: u32,
 ) {
-    let z_inverse = vertex.position.z.recip();
-
-    *vertex *= z_inverse;
+    let w_inverse = vertex.position.w.recip();
 
     vertex.position.x = (vertex.position.x + 1.0) * (screen_width as f32 / 2.0);
     vertex.position.y = (-vertex.position.y + 1.0) * (screen_height as f32 / 2.0);
 
-    vertex.position.z = z_inverse;
+    vertex.position.w = w_inverse;
 }
