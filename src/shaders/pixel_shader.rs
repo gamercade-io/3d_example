@@ -15,9 +15,9 @@ pub struct ColorBlend;
 impl PixelShader<3> for ColorBlend {
     fn run(shader_params: SVector<f32, 3>) -> Color {
         Color {
-            r: (shader_params.x * 255.0) as u8,
-            g: (shader_params.y * 255.0) as u8,
-            b: (shader_params.z * 255.0) as u8,
+            r: (shader_params.x.clamp(0.0, 1.0) * 255.0) as u8,
+            g: (shader_params.y.clamp(0.0, 1.0) * 255.0) as u8,
+            b: (shader_params.z.clamp(0.0, 1.0) * 255.0) as u8,
         }
     }
 }
