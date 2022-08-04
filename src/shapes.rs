@@ -68,3 +68,23 @@ pub fn cube(size: f32) -> [Point3<f32>; 8] {
         Point3::new(side, side, side),
     ]
 }
+
+pub fn plane(size: f32) -> [Point3<f32>; 4] {
+    let side = size;
+    [
+        Point3::new(-side, side, 0.0),
+        Point3::new(side, side, 0.0),
+        Point3::new(side, -side, 0.0),
+        Point3::new(-side, -side, 0.0),
+    ]
+}
+
+pub const PLANE_UVS: [Vector2<f32>; 4] = [
+    Vector2::new(0.0, 0.0),
+    Vector2::new(1.0, 0.0),
+    Vector2::new(1.0, 1.0),
+    Vector2::new(0.0, 1.0),
+];
+
+pub const PLANE_INDICES: [IndexedTriangle; 2] =
+    [IndexedTriangle(0, 1, 2), IndexedTriangle(0, 2, 3)];

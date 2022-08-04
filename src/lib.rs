@@ -14,8 +14,11 @@ mod shapes;
 mod types;
 
 use shaders::bind_model_matrix;
-use shaders::bind_view_matrix;
+use shaders::Textured;
 use shaders::{vertex_shader, ColorBlend, DefaultGeometryShader, DefaultVertexShader};
+use shapes::plane;
+use shapes::PLANE_INDICES;
+use shapes::PLANE_UVS;
 use shapes::{cube, CUBE_COLORS, CUBE_INCIDES, CUBE_UVS, SIDE};
 
 use gpu::Gpu;
@@ -26,7 +29,7 @@ pub struct GameState {
     pub screen_width: usize,
     pub screen_height: usize,
     pub dt: f32,
-    pub vertex_data: Box<[RawPoint<3>]>,
+    pub vertex_data: Box<[RawPoint<2>]>,
     pub index_data: Box<[IndexedTriangle]>,
     pub roll: f32,
     pub pitch: f32,
@@ -35,7 +38,7 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut PIPELINE: MaybeUninit<Pipeline<3, 3, 3>> = MaybeUninit::uninit();
+static mut PIPELINE: MaybeUninit<Pipeline<2, 2, 2>> = MaybeUninit::uninit();
 static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
@@ -64,6 +67,16 @@ pub unsafe extern "C" fn init() {
         .collect::<Vec<_>>()
         .into_boxed_slice();
 
+    let vertex_data_plane = plane(SIDE)
+        .into_iter()
+        .zip(PLANE_UVS.into_iter())
+        .map(|(position, color)| RawPoint {
+            position,
+            parameters: color,
+        })
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+
     let screen_width = gc::width();
     let screen_height = gc::height();
 
@@ -77,8 +90,8 @@ pub unsafe extern "C" fn init() {
         screen_width,
         screen_height,
         dt: gc::frame_time(),
-        vertex_data: vertex_data_colored,
-        index_data: Box::new(CUBE_INCIDES),
+        vertex_data: vertex_data_plane,
+        index_data: Box::new(PLANE_INDICES),
         roll: 0.0,
         pitch: 0.0,
         yaw: 0.0,
@@ -136,7 +149,7 @@ pub unsafe extern "C" fn draw() {
     raw::clear_screen(0);
     gpu.clear_z_buffer();
 
-    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, ColorBlend>(
+    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, Textured>(
         &game_state.vertex_data,
         &game_state.index_data,
         &mut gpu.z_buffer,
