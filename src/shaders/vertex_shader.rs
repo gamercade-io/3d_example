@@ -3,7 +3,6 @@ use std::mem::MaybeUninit;
 use nalgebra::{Perspective3, Transform3};
 
 use crate::types::{RawPoint, TriangleVertex};
-
 static mut MODEL: MaybeUninit<Transform3<f32>> = MaybeUninit::uninit();
 static mut VIEW: MaybeUninit<Transform3<f32>> = MaybeUninit::uninit();
 static mut PROJECTION: MaybeUninit<Perspective3<f32>> = MaybeUninit::uninit();
@@ -17,19 +16,23 @@ pub fn get_projection_matrix() -> Perspective3<f32> {
     unsafe { PROJECTION.assume_init() }
 }
 
-pub fn bind_model_matrix(model: Transform3<f32>) {
-    unsafe {
-        MODEL.write(model);
-    }
-}
-
 pub fn bind_view_matrix(view: Transform3<f32>) {
     unsafe {
         VIEW.write(view);
     }
 }
 
-pub fn init_projection(screen_width: u32, screen_height: u32) {
+pub fn get_model_matrix() -> Transform3<f32> {
+    unsafe { MODEL.assume_init() }
+}
+
+pub fn bind_model_matrix(model: Transform3<f32>) {
+    unsafe {
+        MODEL.write(model);
+    }
+}
+
+pub fn init_projection(screen_width: usize, screen_height: usize) {
     // 103 for 16:9
     let fov = 103f32.to_radians();
     let close = 1.0;
@@ -43,10 +46,6 @@ pub fn init_projection(screen_width: u32, screen_height: u32) {
             far,
         ));
     }
-}
-
-pub fn get_model_matrix() -> Transform3<f32> {
-    unsafe { MODEL.assume_init() }
 }
 
 pub fn get_view_matrix() -> Transform3<f32> {

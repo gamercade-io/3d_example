@@ -1,23 +1,30 @@
-use gamercade_rs::prelude as gc;
-use gamercade_rs::raw;
-use nalgebra::{Rotation3, Transform3, Translation3, Vector3};
-use pipeline::Pipeline;
-use shaders::{vertex_shader, ColorBlend, DefaultGeometryShader, DefaultVertexShader};
 use std::{f32::consts::PI, mem::MaybeUninit};
 
+use nalgebra::{Rotation3, Transform3, Translation3, Vector3};
+
+use gamercade_rs::prelude as gc;
+use gamercade_rs::raw;
+
+mod gpu;
 mod graphics;
 mod image;
+mod pipeline;
 mod shaders;
 mod shapes;
 mod types;
 
-mod pipeline;
+use shaders::bind_model_matrix;
+use shaders::bind_view_matrix;
+use shaders::{vertex_shader, ColorBlend, DefaultGeometryShader, DefaultVertexShader};
 use shapes::{cube, CUBE_COLORS, CUBE_INCIDES, CUBE_UVS, SIDE};
+
+use gpu::Gpu;
+use pipeline::Pipeline;
 use types::{IndexedTriangle, RawPoint};
 
 pub struct GameState {
-    pub screen_width: u32,
-    pub screen_height: u32,
+    pub screen_width: usize,
+    pub screen_height: usize,
     pub dt: f32,
     pub vertex_data: Box<[RawPoint<3>]>,
     pub index_data: Box<[IndexedTriangle]>,
@@ -29,6 +36,7 @@ pub struct GameState {
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
 static mut PIPELINE: MaybeUninit<Pipeline<3, 3, 3>> = MaybeUninit::uninit();
+static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
 
@@ -56,13 +64,14 @@ pub unsafe extern "C" fn init() {
         .collect::<Vec<_>>()
         .into_boxed_slice();
 
-    let screen_width = gc::width() as u32;
-    let screen_height = gc::height() as u32;
+    let screen_width = gc::width();
+    let screen_height = gc::height();
 
     PIPELINE.write(Pipeline::new(screen_width, screen_height));
+    GPU.write(Gpu::new(screen_width, screen_height));
 
-    vertex_shader::bind_model_matrix(Transform3::identity());
     vertex_shader::init_projection(screen_width, screen_height);
+    bind_model_matrix(Transform3::identity());
 
     GAME_STATE.write(GameState {
         screen_width,
@@ -108,7 +117,7 @@ pub unsafe extern "C" fn update() {
     }
 
     let view = Transform3::identity()
-        * Translation3::from(game_state.camera_position)
+        * Translation3::from(-game_state.camera_position)
         * Rotation3::from_euler_angles(game_state.roll, game_state.pitch, game_state.yaw);
 
     vertex_shader::bind_view_matrix(view);
@@ -121,12 +130,15 @@ pub unsafe extern "C" fn draw() {
     // Some local working data
     let game_state = GAME_STATE.assume_init_ref();
     let pipeline = PIPELINE.assume_init_mut();
+    let gpu = GPU.assume_init_mut();
 
     // Clear the screen every frame
     raw::clear_screen(0);
+    gpu.clear_z_buffer();
 
     pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, ColorBlend>(
         &game_state.vertex_data,
         &game_state.index_data,
+        &mut gpu.z_buffer,
     );
 }

@@ -83,7 +83,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             let cross_result = (b - a).cross(&(c - a));
             let dot_compare = a - eye_position;
             let dot_result = cross_result.dot(&dot_compare);
-            dot_result <= 0.0
+            dot_result < 0.0
         });
 
         //Convert the verts into screen space

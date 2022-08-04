@@ -1,11 +1,15 @@
 use crate::{
+    gpu::ZBuffer,
     shaders::pixel_shader::PixelShader,
     types::{Triangle, TriangleVertex},
 };
 
 use gamercade_rs::prelude as gc;
 
-pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(mut triangle: Triangle<D>) {
+pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(
+    mut triangle: Triangle<D>,
+    z_buffer: &mut ZBuffer,
+) {
     // Sort verts from top (low) to bottom (high)
     triangle
         .vertices
@@ -17,14 +21,14 @@ pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(mut triangle: Triangle<
         if triangle.vertices[0].position.x > triangle.vertices[1].position.x {
             triangle.vertices.swap(0, 1);
         }
-        draw_flat_top_triangle::<PS, D>(triangle);
+        draw_flat_top_triangle::<PS, D>(triangle, z_buffer);
     } else if triangle.vertices[1].position.y == triangle.vertices[2].position.y {
         // Flat Bottom
         // We want to go left -> right
         if triangle.vertices[1].position.x > triangle.vertices[2].position.x {
             triangle.vertices.swap(1, 2);
         }
-        draw_flat_bottom_triangle::<PS, D>(triangle);
+        draw_flat_bottom_triangle::<PS, D>(triangle, z_buffer);
     } else {
         // Split the triangle into a flat top and flat bottom triangle
         let alpha = (triangle.vertices[1].position.y - triangle.vertices[0].position.y)
@@ -41,25 +45,40 @@ pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(mut triangle: Triangle<
 
         if split.position.x > triangle.vertices[1].position.x {
             // Split is on the right side
-            draw_flat_bottom_triangle::<PS, D>(Triangle {
-                vertices: [triangle.vertices[0], triangle.vertices[1], split],
-            });
-            draw_flat_top_triangle::<PS, D>(Triangle {
-                vertices: [triangle.vertices[1], split, triangle.vertices[2]],
-            });
+            draw_flat_bottom_triangle::<PS, D>(
+                Triangle {
+                    vertices: [triangle.vertices[0], triangle.vertices[1], split],
+                },
+                z_buffer,
+            );
+            draw_flat_top_triangle::<PS, D>(
+                Triangle {
+                    vertices: [triangle.vertices[1], split, triangle.vertices[2]],
+                },
+                z_buffer,
+            );
         } else {
             // Split is on the left side
-            draw_flat_bottom_triangle::<PS, D>(Triangle {
-                vertices: [triangle.vertices[0], split, triangle.vertices[1]],
-            });
-            draw_flat_top_triangle::<PS, D>(Triangle {
-                vertices: [split, triangle.vertices[1], triangle.vertices[2]],
-            });
+            draw_flat_bottom_triangle::<PS, D>(
+                Triangle {
+                    vertices: [triangle.vertices[0], split, triangle.vertices[1]],
+                },
+                z_buffer,
+            );
+            draw_flat_top_triangle::<PS, D>(
+                Triangle {
+                    vertices: [split, triangle.vertices[1], triangle.vertices[2]],
+                },
+                z_buffer,
+            );
         }
     }
 }
 
-fn draw_flat_top_triangle<PS: PixelShader<D>, const D: usize>(triangle: Triangle<D>) {
+fn draw_flat_top_triangle<PS: PixelShader<D>, const D: usize>(
+    triangle: Triangle<D>,
+    z_buffer: &mut ZBuffer,
+) {
     let verts = triangle.vertices;
     let delta_y = verts[2].position.y - verts[0].position.y;
     let dit0 = (verts[2] - verts[0]) / delta_y;
@@ -67,10 +86,13 @@ fn draw_flat_top_triangle<PS: PixelShader<D>, const D: usize>(triangle: Triangle
 
     let edge_interpolator = verts[1];
 
-    draw_flat_triangle::<PS, D>(triangle, dit0, dit1, edge_interpolator);
+    draw_flat_triangle::<PS, D>(triangle, dit0, dit1, edge_interpolator, z_buffer);
 }
 
-fn draw_flat_bottom_triangle<PS: PixelShader<D>, const D: usize>(triangle: Triangle<D>) {
+fn draw_flat_bottom_triangle<PS: PixelShader<D>, const D: usize>(
+    triangle: Triangle<D>,
+    z_buffer: &mut ZBuffer,
+) {
     let verts = triangle.vertices;
     let delta_y = verts[2].position.y - verts[0].position.y;
     let dit0 = (verts[1] - verts[0]) / delta_y;
@@ -78,7 +100,7 @@ fn draw_flat_bottom_triangle<PS: PixelShader<D>, const D: usize>(triangle: Trian
 
     let edge_interpolator = verts[0];
 
-    draw_flat_triangle::<PS, D>(triangle, dit0, dit1, edge_interpolator);
+    draw_flat_triangle::<PS, D>(triangle, dit0, dit1, edge_interpolator, z_buffer);
 }
 
 fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
@@ -86,6 +108,7 @@ fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
     dv0: TriangleVertex<D>,
     dv1: TriangleVertex<D>,
     mut interpolator_edge_1: TriangleVertex<D>,
+    z_buffer: &mut ZBuffer,
 ) {
     let mut interpolator_edge_0 = triangle.vertices[0];
 
@@ -107,8 +130,7 @@ fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
             delta_interpolation_line * (x_start as f32 + 0.5 - interpolator_edge_0.position.x);
 
         (x_start..x_end).for_each(|x| {
-            // TODO: Add Z Buffer check
-            if true {
+            if z_buffer.test_and_set(x as usize, y as usize, interpolation_line.position.z) {
                 let w = interpolation_line.position.w.recip();
                 let params = interpolation_line.parameters * w;
                 let color = PS::run(params).to_graphics_params();
