@@ -112,15 +112,15 @@ fn draw_flat_triangle<PS: PixelShader<D>, const D: usize>(
 ) {
     let mut interpolator_edge_0 = triangle.vertices[0];
 
-    let y_start = (triangle.vertices[0].position.y - 0.5).ceil() as i32;
-    let y_end = (triangle.vertices[2].position.y - 0.5).ceil() as i32;
+    let y_start = ((triangle.vertices[0].position.y - 0.5).ceil() as i32).max(0);
+    let y_end = ((triangle.vertices[2].position.y - 0.5).ceil() as i32).min(z_buffer.screen_height as i32 - 1);
 
     interpolator_edge_0 += dv0 * (y_start as f32 + 0.5 - triangle.vertices[0].position.y);
     interpolator_edge_1 += dv1 * (y_start as f32 + 0.5 - triangle.vertices[0].position.y);
 
     (y_start..y_end).for_each(|y| {
-        let x_start = (interpolator_edge_0.position.x - 0.5).ceil() as i32;
-        let x_end = (interpolator_edge_1.position.x - 0.5).ceil() as i32;
+        let x_start = ((interpolator_edge_0.position.x - 0.5).ceil() as i32).max(0);
+        let x_end = ((interpolator_edge_1.position.x - 0.5).ceil() as i32).min(z_buffer.screen_width as i32 - 1);
 
         let mut interpolation_line = interpolator_edge_0;
         let dx = interpolator_edge_1.position.x - interpolator_edge_0.position.x;

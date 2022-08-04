@@ -16,8 +16,8 @@ impl Gpu {
 
 pub struct ZBuffer {
     buffer: Box<[f32]>,
-    screen_width: usize,
-    screen_height: usize,
+    pub screen_width: usize,
+    pub screen_height: usize,
 }
 
 impl ZBuffer {
