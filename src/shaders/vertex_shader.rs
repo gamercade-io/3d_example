@@ -10,7 +10,7 @@ static mut PROJECTION: MaybeUninit<Perspective3<f32>> = MaybeUninit::uninit();
 
 // Processes verticies and places them into the output buffer
 pub trait VertexShader<const VSIN: usize, const VSOUT: usize> {
-    fn run(vertex: RawPoint<VSIN>) -> TriangleVertex<VSOUT>;
+    fn run(vertex: &RawPoint<VSIN>) -> TriangleVertex<VSOUT>;
 }
 
 pub fn get_projection_matrix() -> Perspective3<f32> {
@@ -54,7 +54,7 @@ pub fn get_view_matrix() -> Transform3<f32> {
 pub struct DefaultVertexShader;
 
 impl<const VSINOUT: usize> VertexShader<VSINOUT, VSINOUT> for DefaultVertexShader {
-    fn run(vertex: RawPoint<VSINOUT>) -> TriangleVertex<VSINOUT> {
+    fn run(vertex: &RawPoint<VSINOUT>) -> TriangleVertex<VSINOUT> {
         let position: Vector4<f32> = vertex.position.into();
         let model = get_model_matrix();
         let view = get_view_matrix();
@@ -64,7 +64,7 @@ impl<const VSINOUT: usize> VertexShader<VSINOUT, VSINOUT> for DefaultVertexShade
         let position = mvp * position;
 
         TriangleVertex {
-            position: position,
+            position,
             parameters: vertex.parameters,
         }
     }

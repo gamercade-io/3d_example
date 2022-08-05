@@ -43,15 +43,15 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
         // Process vertices by applying the Vertex Shader
         // to each vertex, and storing their output in gs_input
         self.gs_input
-            .extend(raw_vertices.iter().map(|raw_vertex| VS::run(*raw_vertex)));
+            .extend(raw_vertices.iter().map(|raw_vertex| VS::run(raw_vertex)));
 
         // Assemble our triangles, using indices
         // and place them into the triangle buffer.
         self.triangle_buffer
             .extend(raw_indices.iter().map(|triangle_indices| {
-                let a = self.gs_input[triangle_indices.0];
-                let b = self.gs_input[triangle_indices.1];
-                let c = self.gs_input[triangle_indices.2];
+                let a = self.gs_input[triangle_indices.0].clone();
+                let b = self.gs_input[triangle_indices.1].clone();
+                let c = self.gs_input[triangle_indices.2].clone();
 
                 Triangle {
                     vertices: [a, b, c],
@@ -82,6 +82,8 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             let dot_result = cross_result.dot(&dot_compare);
             dot_result <= 0.0
         });
+
+        // Clip triangles
 
         //Convert the verts into screen space
         self.ps_input.iter_mut().for_each(|triangle| {

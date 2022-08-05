@@ -41,22 +41,35 @@ pub struct Triangle<const IN: usize> {
     pub vertices: [TriangleVertex<IN>; 3],
 }
 
-#[derive(Copy, Clone)]
+impl<const D: usize> Triangle<D> {
+    pub fn to_ref(&'_ self) -> TriangleRef<'_, D> {
+        TriangleRef {
+            vertices: [&self.vertices[0], &self.vertices[1], &self.vertices[2]],
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct TriangleRef<'a, const D: usize> {
+    pub vertices: [&'a TriangleVertex<D>; 3],
+}
+
+#[derive(Clone)]
 pub struct RawPoint<const IN: usize> {
     pub position: Point3<f32>,
     pub parameters: SVector<f32, IN>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct TriangleVertex<const IN: usize> {
     pub position: Vector4<f32>,
     pub parameters: SVector<f32, IN>,
 }
 
-impl<const D: usize> Sub for TriangleVertex<D> {
-    type Output = Self;
+impl<const D: usize> Sub for &TriangleVertex<D> {
+    type Output = TriangleVertex<D>;
 
-    fn sub(self, rhs: Self) -> Self::Output {
+    fn sub(self, rhs: &TriangleVertex<D>) -> Self::Output {
         TriangleVertex {
             position: self.position - rhs.position,
             parameters: self.parameters - rhs.parameters,
@@ -75,8 +88,8 @@ impl<const D: usize> Div<f32> for TriangleVertex<D> {
     }
 }
 
-impl<const D: usize> Mul<f32> for TriangleVertex<D> {
-    type Output = Self;
+impl<const D: usize> Mul<f32> for &TriangleVertex<D> {
+    type Output = TriangleVertex<D>;
 
     fn mul(self, rhs: f32) -> Self::Output {
         TriangleVertex {
@@ -95,6 +108,13 @@ impl<const D: usize> MulAssign<f32> for TriangleVertex<D> {
 
 impl<const D: usize> AddAssign for TriangleVertex<D> {
     fn add_assign(&mut self, rhs: Self) {
+        self.position += rhs.position;
+        self.parameters += rhs.parameters;
+    }
+}
+
+impl<const D: usize> AddAssign<&Self> for TriangleVertex<D> {
+    fn add_assign(&mut self, rhs: &Self) {
         self.position += rhs.position;
         self.parameters += rhs.parameters;
     }
