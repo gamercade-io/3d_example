@@ -1,6 +1,7 @@
 use std::mem::MaybeUninit;
 
-use nalgebra::{Perspective3, Transform3};
+use gamercade_rs::text::console_log;
+use nalgebra::{Perspective3, Transform3, Vector4};
 
 use crate::types::{RawPoint, TriangleVertex};
 static mut MODEL: MaybeUninit<Transform3<f32>> = MaybeUninit::uninit();
@@ -34,17 +35,15 @@ pub fn bind_model_matrix(model: Transform3<f32>) {
 
 pub fn init_projection(screen_width: usize, screen_height: usize) {
     // 103 for 16:9
-    let fov = 103f32.to_radians();
+    let aspect_ratio = screen_width as f32 / screen_height as f32;
+    let hfov = 103f32.to_radians();
+    let vfov = 2.0 * ((hfov / 2.0).tan() * aspect_ratio.recip()).atan();
+    console_log(&format!("vertical fov: {}", vfov.to_degrees()));
     let close = 1.0;
     let far = 1000.0;
 
     unsafe {
-        PROJECTION.write(Perspective3::new(
-            screen_width as f32 / screen_height as f32,
-            fov,
-            close,
-            far,
-        ));
+        PROJECTION.write(Perspective3::new(aspect_ratio, vfov, close, far));
     }
 }
 
@@ -56,16 +55,16 @@ pub struct DefaultVertexShader;
 
 impl<const VSINOUT: usize> VertexShader<VSINOUT, VSINOUT> for DefaultVertexShader {
     fn run(vertex: RawPoint<VSINOUT>) -> TriangleVertex<VSINOUT> {
+        let position: Vector4<f32> = vertex.position.into();
         let model = get_model_matrix();
         let view = get_view_matrix();
         let projection = get_projection_matrix();
 
-        let mvp = projection.as_matrix() * (view * model).to_homogeneous();
-
-        let position = mvp.transform_point(&vertex.position);
+        let mvp = projection.as_matrix() * (model * view).to_homogeneous();
+        let position = mvp * position;
 
         TriangleVertex {
-            position: position.into(),
+            position: position,
             parameters: vertex.parameters,
         }
     }
