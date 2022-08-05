@@ -29,7 +29,7 @@ pub struct GameState {
     pub screen_width: usize,
     pub screen_height: usize,
     pub dt: f32,
-    pub vertex_data: Box<[RawPoint<2>]>,
+    pub vertex_data: Box<[RawPoint<3>]>,
     pub index_data: Box<[IndexedTriangle]>,
     // pub roll: f32,
     // pub pitch: f32,
@@ -40,7 +40,7 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut PIPELINE: MaybeUninit<Pipeline<2, 2, 2>> = MaybeUninit::uninit();
+static mut PIPELINE: MaybeUninit<Pipeline<3, 3, 3>> = MaybeUninit::uninit();
 static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
@@ -92,8 +92,8 @@ pub unsafe extern "C" fn init() {
         screen_width,
         screen_height,
         dt: gc::frame_time(),
-        vertex_data: vertex_data_plane,
-        index_data: Box::new(PLANE_INDICES),
+        vertex_data: vertex_data_colored,
+        index_data: Box::new(CUBE_INCIDES),
         rot_x: 0.0,
         rot_y: 0.0,
         camera_position: Vector3::new(0.0, 0.0, 2.0),
@@ -107,34 +107,42 @@ pub unsafe extern "C" fn update() {
     let game_state = GAME_STATE.assume_init_mut();
 
     if Some(true) == gc::button_up_held(0) {
-        game_state.rot_x -= ROT_SPEED;
-    } else if Some(true) == gc::button_down_held(0) {
-        game_state.rot_x += ROT_SPEED
-    }
-
-    if Some(true) == gc::button_right_held(0) {
         game_state.rot_y += ROT_SPEED;
-    } else if Some(true) == gc::button_left_held(0) {
+    } else if Some(true) == gc::button_down_held(0) {
         game_state.rot_y -= ROT_SPEED
     }
 
-    let camera_rot = Rotation3::from_euler_angles(game_state.rot_x, game_state.rot_y, 0.0);
+    if Some(true) == gc::button_right_held(0) {
+        game_state.rot_x += ROT_SPEED;
+    } else if Some(true) == gc::button_left_held(0) {
+        game_state.rot_x -= ROT_SPEED
+    }
+
+    let forward = &Vector3::new(
+        game_state.rot_x.cos() * game_state.rot_y.cos(),
+        game_state.rot_y.sin(),
+        game_state.rot_x.sin() * game_state.rot_y.cos(),
+    )
+    .normalize();
 
     if Some(true) == gc::button_b_held(0) {
-        game_state.camera_position -= camera_rot.inverse() * Vector3::z_axis().scale(ROT_SPEED);
+        game_state.camera_position -= forward * ROT_SPEED;
     } else if Some(true) == gc::button_c_held(0) {
-        game_state.camera_position += camera_rot.inverse() * Vector3::z_axis().scale(ROT_SPEED);
+        game_state.camera_position += forward * ROT_SPEED;
     }
+
+    let right = Vector3::new(forward.z, forward.y, -forward.x);
 
     if Some(true) == gc::button_a_held(0) {
-        game_state.camera_position -= camera_rot.inverse() * Vector3::x_axis().scale(ROT_SPEED);
+        game_state.camera_position -= right * ROT_SPEED;
     } else if Some(true) == gc::button_d_held(0) {
-        game_state.camera_position += camera_rot.inverse() * Vector3::x_axis().scale(ROT_SPEED);
+        game_state.camera_position += right * ROT_SPEED;
     }
 
-    let view = Transform3::identity()
-        * camera_rot
-        * Translation3::from(-game_state.camera_position);
+    let camera_rot = Rotation3::look_at_rh(forward, &Vector3::y_axis());
+
+    let view =
+        Transform3::identity() * camera_rot * Translation3::from(-game_state.camera_position);
 
     vertex_shader::bind_view_matrix(view);
 }
@@ -152,7 +160,7 @@ pub unsafe extern "C" fn draw() {
     raw::clear_screen(0);
     gpu.clear_z_buffer();
 
-    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, Textured>(
+    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, ColorBlend>(
         &game_state.vertex_data,
         &game_state.index_data,
         &mut gpu.z_buffer,
