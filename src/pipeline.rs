@@ -1,5 +1,4 @@
-use gamercade_rs::text::console_log;
-use nalgebra::{Point3, Vector3, Vector4};
+use nalgebra::Vector4;
 
 use crate::{
     gpu::ZBuffer,
@@ -67,10 +66,8 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
                 .map(|triangle| GS::run(triangle)),
         );
 
-        let eye_position: Vector4<f32> = vertex_shader::get_projection_matrix()
-            .as_matrix()
-            .transform_point(&Point3::new(0.0, 0.0, 0.0))
-            .into();
+        let eye_position: Vector4<f32> =
+            vertex_shader::get_projection_matrix().as_matrix() * Vector4::new(0.0, 0.0, 0.0, 1.0);
 
         let eye_position = eye_position.xyz();
 

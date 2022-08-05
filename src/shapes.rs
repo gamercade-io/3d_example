@@ -18,18 +18,18 @@ pub const CUBE_EDGES: [TriangleEdge; 12] = [
 ];
 
 pub const CUBE_INCIDES: [IndexedTriangle; 12] = [
-    IndexedTriangle(0, 2, 1),
-    IndexedTriangle(2, 3, 1),
-    IndexedTriangle(1, 3, 5),
-    IndexedTriangle(3, 7, 5),
-    IndexedTriangle(2, 6, 3),
-    IndexedTriangle(3, 6, 7),
-    IndexedTriangle(4, 5, 7),
-    IndexedTriangle(4, 7, 6),
-    IndexedTriangle(0, 4, 2),
-    IndexedTriangle(2, 4, 6),
-    IndexedTriangle(0, 1, 4),
-    IndexedTriangle(1, 5, 4),
+    IndexedTriangle(0, 1, 2),
+    IndexedTriangle(2, 1, 3),
+    IndexedTriangle(1, 5, 3),
+    IndexedTriangle(3, 5, 7),
+    IndexedTriangle(2, 3, 6),
+    IndexedTriangle(3, 7, 6),
+    IndexedTriangle(4, 7, 5),
+    IndexedTriangle(4, 6, 7),
+    IndexedTriangle(0, 2, 4),
+    IndexedTriangle(2, 6, 4),
+    IndexedTriangle(0, 4, 1),
+    IndexedTriangle(1, 4, 5),
 ];
 
 pub const CUBE_COLORS: [Vector3<f32>; 8] = [
