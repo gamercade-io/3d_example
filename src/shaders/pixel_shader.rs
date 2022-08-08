@@ -29,8 +29,8 @@ impl Textured {
         let u = (u * (IMAGE_WIDTH - 1) as f32) as usize;
         let v = (v * (IMAGE_HEIGHT - 1) as f32) as usize;
 
-        let u = u.clamp(0, IMAGE_WIDTH);
-        let v = v.clamp(0, IMAGE_HEIGHT);
+        let u = u.clamp(0, IMAGE_WIDTH - 1);
+        let v = v.clamp(0, IMAGE_HEIGHT - 1);
 
         image::get_image()[(v * IMAGE_WIDTH) + u]
     }

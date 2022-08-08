@@ -29,7 +29,7 @@ pub struct GameState {
     pub screen_width: usize,
     pub screen_height: usize,
     pub dt: f32,
-    pub vertex_data: Box<[RawPoint<3>]>,
+    pub vertex_data: Box<[RawPoint<2>]>,
     pub index_data: Box<[IndexedTriangle]>,
     // pub roll: f32,
     // pub pitch: f32,
@@ -40,7 +40,7 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut PIPELINE: MaybeUninit<Pipeline<3, 3, 3>> = MaybeUninit::uninit();
+static mut PIPELINE: MaybeUninit<Pipeline<2, 2, 2>> = MaybeUninit::uninit();
 static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
@@ -92,7 +92,7 @@ pub unsafe extern "C" fn init() {
         screen_width,
         screen_height,
         dt: gc::frame_time(),
-        vertex_data: vertex_data_colored,
+        vertex_data: vertex_data_uvs,
         index_data: Box::new(CUBE_INCIDES),
         rot_x: 0.0,
         rot_y: 0.0,
@@ -160,7 +160,7 @@ pub unsafe extern "C" fn draw() {
     raw::clear_screen(0);
     gpu.clear_z_buffer();
 
-    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, ColorBlend>(
+    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, Textured>(
         &game_state.vertex_data,
         &game_state.index_data,
         &mut gpu.z_buffer,
