@@ -51,30 +51,30 @@ const ROT_SPEED: f32 = PI * 0.01;
 pub unsafe extern "C" fn init() {
     let vertex_data_uvs = cube(SIDE)
         .into_iter()
-        .zip(CUBE_UVS.into_iter())
+        .zip(CUBE_UVS.iter())
         .map(|(position, uvs)| RawPoint {
             position,
-            parameters: uvs,
+            parameters: *uvs,
         })
         .collect::<Vec<_>>()
         .into_boxed_slice();
 
     let vertex_data_colored = cube(SIDE)
         .into_iter()
-        .zip(CUBE_COLORS.into_iter())
+        .zip(CUBE_COLORS.iter())
         .map(|(position, color)| RawPoint {
             position,
-            parameters: color,
+            parameters: *color,
         })
         .collect::<Vec<_>>()
         .into_boxed_slice();
 
     let vertex_data_plane = plane(SIDE)
         .into_iter()
-        .zip(PLANE_UVS.into_iter())
+        .zip(PLANE_UVS.iter())
         .map(|(position, color)| RawPoint {
             position,
-            parameters: color,
+            parameters: *color,
         })
         .collect::<Vec<_>>()
         .into_boxed_slice();

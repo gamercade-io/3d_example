@@ -2,7 +2,7 @@ use nalgebra::{Point3, Vector2, Vector3};
 
 use crate::types::{IndexedTriangle, TriangleEdge};
 
-pub const CUBE_EDGES: [TriangleEdge; 12] = [
+pub const CUBE_EDGES: &[TriangleEdge; 12] = &[
     TriangleEdge(0, 1),
     TriangleEdge(1, 3),
     TriangleEdge(3, 2),
@@ -32,7 +32,7 @@ pub const CUBE_INCIDES: [IndexedTriangle; 12] = [
     IndexedTriangle(1, 4, 5),
 ];
 
-pub const CUBE_COLORS: [Vector3<f32>; 8] = [
+pub const CUBE_COLORS: &[Vector3<f32>; 8] = &[
     Vector3::new(0.0, 0.0, 1.0),
     Vector3::new(0.0, 1.0, 0.0),
     Vector3::new(0.0, 1.0, 1.0),
@@ -43,7 +43,7 @@ pub const CUBE_COLORS: [Vector3<f32>; 8] = [
     Vector3::new(1.0, 0.0, 1.0),
 ];
 
-pub const CUBE_UVS: [Vector2<f32>; 8] = [
+pub const CUBE_UVS: &[Vector2<f32>; 8] = &[
     Vector2::new(0.0, 0.0),
     Vector2::new(1.0, 0.0),
     Vector2::new(0.0, 1.0),
@@ -79,12 +79,12 @@ pub fn plane(size: f32) -> [Point3<f32>; 4] {
     ]
 }
 
-pub const PLANE_UVS: [Vector2<f32>; 4] = [
+pub const PLANE_UVS: &[Vector2<f32>; 4] = &[
     Vector2::new(0.0, 0.0),
     Vector2::new(1.0, 0.0),
     Vector2::new(1.0, 1.0),
     Vector2::new(0.0, 1.0),
 ];
 
-pub const PLANE_INDICES: [IndexedTriangle; 2] =
-    [IndexedTriangle(0, 1, 2), IndexedTriangle(0, 2, 3)];
+pub const PLANE_INDICES: &[IndexedTriangle; 2] =
+    &[IndexedTriangle(0, 1, 2), IndexedTriangle(0, 2, 3)];
