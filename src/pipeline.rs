@@ -83,7 +83,7 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
             dot_result <= 0.0
         });
 
-        // Clip triangles
+        // TODO: Clip triangles
 
         //Convert the verts into screen space
         self.ps_input.iter_mut().for_each(|triangle| {
