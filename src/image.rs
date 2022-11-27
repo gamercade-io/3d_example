@@ -1,4 +1,4 @@
-use gamercade_rs::text::console_log;
+use gamercade_rs::prelude::console_log;
 
 use crate::types::Color;
 

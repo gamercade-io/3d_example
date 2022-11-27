@@ -1,6 +1,6 @@
 use std::ops::{AddAssign, Div, Mul, MulAssign, Sub};
 
-use gamercade_rs::GraphicsParameters;
+use gamercade_rs::prelude::GraphicsParameters;
 use nalgebra::{Point3, SVector, Vector4};
 
 pub struct TriangleEdge(pub usize, pub usize);

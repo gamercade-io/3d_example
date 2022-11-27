@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use gamercade_rs::text::console_log;
+use gamercade_rs::prelude::console_log;
 use nalgebra::{Perspective3, Transform3, Vector4};
 
 use crate::types::{RawPoint, TriangleVertex};
