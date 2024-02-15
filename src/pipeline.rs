@@ -1,35 +1,37 @@
-use nalgebra::Vector4;
+use nalgebra::{Vector3, Vector4};
 
 use crate::{
     gpu::ZBuffer,
     graphics::draw_triangle,
-    shaders::{vertex_shader, GeometryShader, PixelShader, VertexShader},
+    shaders::{mesh_shader, MeshShader, PixelShader},
     types::{IndexedTriangle, RawPoint, Triangle, TriangleVertex},
 };
 
-pub struct Pipeline<const VSIN: usize, const GSIN: usize, const PSIN: usize> {
-    gs_input: Vec<TriangleVertex<GSIN>>,
-    triangle_buffer: Vec<Triangle<GSIN>>,
-    ps_input: Vec<Triangle<PSIN>>,
+pub struct Pipeline<const VSIN: usize, const PSIN: usize> {
+    ms_output: Vec<Triangle<PSIN>>,
 
     screen_width: usize,
     screen_height: usize,
 }
 
-impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSIN, PSIN> {
+impl<const VSIN: usize, const PSIN: usize> Pipeline<VSIN, PSIN> {
     pub fn new(screen_width: usize, screen_height: usize) -> Self {
         Self {
             screen_width,
             screen_height,
-            gs_input: Vec::new(),
-            triangle_buffer: Vec::new(),
-            ps_input: Vec::new(),
+            ms_output: Vec::new(),
         }
     }
 
     pub fn render_scene<
-        VS: VertexShader<VSIN, GSIN>,
-        GS: GeometryShader<GSIN, PSIN>,
+        MS: for<'a> MeshShader<
+            (
+                &'a [RawPoint<VSIN>],
+                &'a [IndexedTriangle],
+                &'a Vector3<f32>,
+            ),
+            PSIN,
+        >,
         PS: PixelShader<PSIN>,
     >(
         &mut self,
@@ -37,64 +39,22 @@ impl<const VSIN: usize, const GSIN: usize, const PSIN: usize> Pipeline<VSIN, GSI
         raw_indices: &[IndexedTriangle],
         depth_buffer: &mut ZBuffer,
     ) {
-        // Clear the buffers
-        self.gs_input.clear();
-
-        // Process vertices by applying the Vertex Shader
-        // to each vertex, and storing their output in gs_input
-        self.gs_input
-            .extend(raw_vertices.iter().map(|raw_vertex| VS::run(raw_vertex)));
-
-        // Assemble our triangles, using indices
-        // and place them into the triangle buffer.
-        self.triangle_buffer
-            .extend(raw_indices.iter().map(|triangle_indices| {
-                let a = self.gs_input[triangle_indices.0].clone();
-                let b = self.gs_input[triangle_indices.1].clone();
-                let c = self.gs_input[triangle_indices.2].clone();
-
-                Triangle {
-                    vertices: [a, b, c],
-                }
-            }));
-
-        // Run the geometry shader on each triangle and
-        // store it in ps_input
-        self.ps_input.extend(
-            self.triangle_buffer
-                .drain(..)
-                .map(|triangle| GS::run(triangle)),
-        );
-
+        // Get our camera eye position
         let eye_position: Vector4<f32> =
-            vertex_shader::get_projection_matrix().as_matrix() * Vector4::new(0.0, 0.0, 0.0, 1.0);
-
+            mesh_shader::get_projection_matrix().as_matrix() * Vector4::new(0.0, 0.0, 0.0, 1.0);
         let eye_position = eye_position.xyz();
 
-        // Do backface Culling
-        self.ps_input.retain(|triangle| {
-            let a = triangle.vertices[0].position.xyz();
-            let b = triangle.vertices[1].position.xyz();
-            let c = triangle.vertices[2].position.xyz();
+        MS::run(
+            (raw_vertices, raw_indices, &eye_position),
+            &mut self.ms_output,
+        );
 
-            let cross_result = (b - a).cross(&(c - a));
-            let dot_compare = a - eye_position;
-            let dot_result = cross_result.dot(&dot_compare);
-            dot_result <= 0.0
-        });
-
-        // TODO: Clip triangles
-
-        //Convert the verts into screen space
-        self.ps_input.iter_mut().for_each(|triangle| {
+        self.ms_output.drain(..).for_each(|mut triangle| {
+            // Convert Tris to screen space
             triangle
                 .vertices
                 .iter_mut()
                 .for_each(|vertex| to_ndc(vertex, self.screen_width, self.screen_height));
-        });
-
-        // Rasterize the triangles
-        self.ps_input.drain(..).for_each(|triangle| {
             draw_triangle::<PS, PSIN>(triangle, depth_buffer);
         });
     }

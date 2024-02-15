@@ -14,8 +14,9 @@ mod shapes;
 mod types;
 
 use shaders::bind_model_matrix;
+use shaders::mesh_shader;
+use shaders::DefaultMeshShader;
 use shaders::Textured;
-use shaders::{vertex_shader, ColorBlend, DefaultGeometryShader, DefaultVertexShader};
 use shapes::plane;
 use shapes::PLANE_INDICES;
 use shapes::PLANE_UVS;
@@ -40,7 +41,7 @@ pub struct GameState {
 }
 
 static mut GAME_STATE: MaybeUninit<GameState> = MaybeUninit::uninit();
-static mut PIPELINE: MaybeUninit<Pipeline<2, 2, 2>> = MaybeUninit::uninit();
+static mut PIPELINE: MaybeUninit<Pipeline<2, 2>> = MaybeUninit::uninit();
 static mut GPU: MaybeUninit<Gpu> = MaybeUninit::uninit();
 
 const ROT_SPEED: f32 = PI * 0.01;
@@ -85,7 +86,7 @@ pub unsafe extern "C" fn init() {
     PIPELINE.write(Pipeline::new(screen_width, screen_height));
     GPU.write(Gpu::new(screen_width, screen_height));
 
-    vertex_shader::init_projection(screen_width, screen_height);
+    mesh_shader::init_projection(screen_width, screen_height);
     bind_model_matrix(Transform3::identity());
 
     GAME_STATE.write(GameState {
@@ -144,7 +145,7 @@ pub unsafe extern "C" fn update() {
     let view =
         Transform3::identity() * camera_rot * Translation3::from(-game_state.camera_position);
 
-    vertex_shader::bind_view_matrix(view);
+    mesh_shader::bind_view_matrix(view);
 }
 
 /// # Safety
@@ -160,7 +161,9 @@ pub unsafe extern "C" fn draw() {
     raw::clear_screen(0);
     gpu.clear_z_buffer();
 
-    pipeline.render_scene::<DefaultVertexShader, DefaultGeometryShader, Textured>(
+    // TODO: Cull objects not viewable by the camera
+
+    pipeline.render_scene::<DefaultMeshShader<2>, Textured>(
         &game_state.vertex_data,
         &game_state.index_data,
         &mut gpu.z_buffer,

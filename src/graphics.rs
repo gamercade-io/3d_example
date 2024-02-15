@@ -6,6 +6,7 @@ use crate::{
 
 use gamercade_rs::prelude as gc;
 
+// Scanline Renderer
 pub fn draw_triangle<PS: PixelShader<D>, const D: usize>(
     mut triangle: Triangle<D>,
     z_buffer: &mut ZBuffer,
